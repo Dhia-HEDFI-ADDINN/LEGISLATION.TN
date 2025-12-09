@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # Next.js Application
+  snij-portal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/snij_db
+    depends_on:
+      - db
+    restart: unless-stopped
+    networks:
+      - snij-network
+
+  # PostgreSQL Database (optional for full implementation)
+  db:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=snij_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - snij-network
+
+  # Meilisearch for full-text search (optional for enhanced search)
+  meilisearch:
+    image: getmeili/meilisearch:v1.5
+    ports:
+      - "7700:7700"
+    environment:
+      - MEILI_MASTER_KEY=masterkey123
+    volumes:
+      - meilisearch_data:/meili_data
+    restart: unless-stopped
+    networks:
+      - snij-network
+
+volumes:
+  postgres_data:
+  meilisearch_data:
+
+networks:
+  snij-network:
+    driver: bridge
