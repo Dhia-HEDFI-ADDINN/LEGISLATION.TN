@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DocumentType {
+  constitution
+  loi
+  decret
+  arrete
+  code
+  circulaire
+  jurisprudence
+}
+
+enum DocumentStatus {
+  en_vigueur
+  abroge
+  modifie
+}
+
+enum UserRole {
+  admin
+  contributeur
+  validateur
+  utilisateur
+}
+
+model Document {
+  id              String         @id @default(uuid())
+  type            DocumentType
+  numero          String
+  titreAr         String
+  titreFr         String
+  titreEn         String
+  datePublication DateTime
+  dateApplication DateTime?
+  jortNumero      String?
+  jortAnnee       Int?
+  jortPage        Int?
+  domaines        String[]
+  ministere       String?
+  contenuAr       String         @db.Text
+  contenuFr       String         @db.Text
+  contenuEn       String         @db.Text
+  resumeAr        String?        @db.Text
+  resumeFr        String?        @db.Text
+  resumeEn        String?        @db.Text
+  pdfOriginal     String?
+  pdfConsolide    String?
+  motsCles        String[]
+  statut          DocumentStatus @default(en_vigueur)
+  vues            Int            @default(0)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  modifie      DocumentLink[] @relation("ModifieDoc")
+  modifiePar   DocumentLink[] @relation("ModifieParDoc")
+  favoris      Favori[]
+  alertes      Alerte[]
+  searchLogs   SearchLog[]
+
+  @@index([type])
+  @@index([datePublication])
+  @@index([statut])
+  @@index([domaines])
+}
+
+model DocumentLink {
+  id              String   @id @default(uuid())
+  sourceId        String
+  targetId        String
+  relation        String   // modifie, modifie_par, abroge, abroge_par, reference
+
+  source          Document @relation("ModifieDoc", fields: [sourceId], references: [id])
+  target          Document @relation("ModifieParDoc", fields: [targetId], references: [id])
+
+  @@unique([sourceId, targetId, relation])
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  nom       String
+  prenom    String
+  role      UserRole @default(utilisateur)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  favoris     Favori[]
+  alertes     Alerte[]
+  searchLogs  SearchLog[]
+  sessions    Session[]
+}
+
+model Favori {
+  id         String   @id @default(uuid())
+  userId     String
+  documentId String
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentId])
+}
+
+model Alerte {
+  id         String   @id @default(uuid())
+  userId     String
+  documentId String?
+  domaine    String?
+  type       DocumentType?
+  keywords   String[]
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SearchLog {
+  id         String   @id @default(uuid())
+  query      String
+  filters    Json?
+  resultsCount Int
+  userId     String?
+  documentId String?
+  createdAt  DateTime @default(now())
+
+  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  document Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+}
+
+model ChatHistory {
+  id        String   @id @default(uuid())
+  sessionId String
+  role      String   // user or assistant
+  content   String   @db.Text
+  sources   Json?
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+}
+
+model Synonym {
+  id         String   @id @default(uuid())
+  terms      String[]
+  locale     String   // ar, fr, en
+  createdAt  DateTime @default(now())
+}
